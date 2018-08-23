@@ -11,6 +11,8 @@
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+from imutils import face_utils
+import dlib
 
 class StableFaceCapture:
 
@@ -50,10 +52,11 @@ class StableFaceCapture:
 
 		# Initialize camera and cascade classifier
 		self.cam = cv2.VideoCapture(0)
+		self.detector=dlib.get_frontal_face_detector()
 		self.camWidth = self.cam.get(cv2.CAP_PROP_FRAME_WIDTH)
 		self.camHeight = self.cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
 		self.camDiag = np.sqrt(self.camWidth**2 + self.camHeight**2)
-		self.faceCascade = cv2.CascadeClassifier('haarcascade_frontalface_alt.xml')
+		self.faceCascade = cv2.CascadeClassifier('etc/haarcascade_frontalface_alt.xml')
 
 		# Region of Interest
 		self.ROI = None # np.array([0,0,0,0]) # (x,y,w,h)
@@ -64,6 +67,10 @@ class StableFaceCapture:
 		# Counters for stable face detection
 		self.noDetectionLimit = noDetectionLimit
 		self.noDetectionCounter = 0
+
+
+	def getCamDims(self):
+		return (self.camWidth, self.camHeight)
 
 
 	def withinThreshold(self, loc):
@@ -97,6 +104,7 @@ class StableFaceCapture:
 		grayRoiImg = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
 		# Get the faces
+
 		faces = self.faceCascade.detectMultiScale(
 				grayRoiImg,
 				scaleFactor=self.cvArgs['scaleFactor'],
@@ -130,6 +138,7 @@ class StableFaceCapture:
 			# If it is the first detection of a face, simply set the variables
 			if(self.F is None): 
 				self.F = np.array([self.ROI[0] + x, self.ROI[1] + y, w, h])
+				# self.ROI = np.array([self.F[0] - 40, self.F[1] - 40, self.F[2]+80, self.F[3] + 80])
 				return self.F
 
 			# Otherwise, check the threshold
@@ -141,7 +150,8 @@ class StableFaceCapture:
 
 				# Otherwise, return the new region, while setting it to be the face region
 				else:
-					self.F = np.array([x,y,w,h])
+					self.F = np.array([self.ROI[0] + x, self.ROI[1] + y, w, h])
+					# self.ROI = np.array([self.F[0] - 40, self.F[1] - 40, self.F[2]+80, self.F[3] + 80])
 					return self.F
 
 
@@ -166,15 +176,64 @@ class StableFaceCapture:
 			X = int(x + float(w)/2 - (self.foreheadSize[0]/2) - int( (w*f)/2))
 			Y = int(y + float(h)/5)
 			return (X, Y, int(w*f), int(h*f))
-			
+
 		else:
 			raise ValueError('"mode" argument can only be either "absolute" or "relative"')
+
+
+class StableKeypointExtractor:
+
+	def __init__(self, dims, landmarks=5, threshold=0.02):
+		
+		self.predictor = dlib.shape_predictor('etc/shape_predictor_' + str(landmarks) + '_face_landmarks.dat')
+		self.threshold = threshold
+		self.camWidth = dims[0]
+		self.camHeight = dims[1]
+		self.camDiag = np.sqrt(dims[0]**2 + dims[1]**2)
+		self.shape = None
+
+
+	def withinThreshold(self, shape):
+		ts = np.abs( (self.shape - shape) / self.camDiag )
+		if (np.all(ts <= self.threshold)):
+			return True
+		else:
+			return False
+
+
+	def detectKeypoints(self, img, loc):
+		
+		# Set camera dimensions
+
+		# Convert data for dlib
+		(x,y,w,h) = loc
+		(x,y,w,h) = (x,y,w+20,h+20)
+		rect = dlib.rectangle(x, y, x+w, y+h)
+		gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+		# If it is the first extraction, set the shape and return it
+		if self.shape is None:
+			self.shape = self.predictor(gray, rect)
+			self.shape = face_utils.shape_to_np(self.shape)
+
+		# Otherwise, check for threshold bounds and return the appropriate shape
+		else:
+			tempshape = self.predictor(gray, rect)
+			tempshape = face_utils.shape_to_np(tempshape)
+
+			if self.withinThreshold(tempshape):
+				return self.shape
+			else:
+				self.shape = tempshape
+
+		return self.shape
 
 
 # DEMO
 if __name__=='__main__':
 
 	cap = StableFaceCapture(threshold=0.025)
+	ke = StableKeypointExtractor(dims=cap.getCamDims(), landmarks=68, threshold=0.02)
 
 	while(True):
 
@@ -182,11 +241,21 @@ if __name__=='__main__':
 		loc = cap.getFace(img)
 
 		if loc is not None:
+			
+			# Grab the forehead and keypoints
 			(x, y, w, h) = loc
 			(fx, fy, fw, fh) = cap.getForehead(loc, mode='relative')
+			shape = ke.detectKeypoints(img, loc)
+
+			# Draw the keypoints
 			cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
 			cv2.rectangle(img, (fx, fy), (fx+fw, fy+fh), (0, 0, 255), 2)
+			for (X, Y) in shape:
+				cv2.circle(img, (X, Y), 1, (0, 0, 255), -1)
+			
+			# Show the image
 			cv2.imshow('camera', img)
+
 		else:
 			cv2.imshow('camera', img)
 			pass
