@@ -19,7 +19,7 @@ class StableFaceCapture:
 		in the frame.
 	'''
 
-	def __init__(self, threshold=0.05, noDetectionLimit=5, cvArgs={'scaleFactor':1.1, 'minNeighbors':5, 'minSize':(30, 30),'flags':cv2.CASCADE_SCALE_IMAGE}):
+	def __init__(self, threshold=0.05, noDetectionLimit=5, foreheadSize=(15, 10), cvArgs={'scaleFactor':1.1, 'minNeighbors':5, 'minSize':(30, 30),'flags':cv2.CASCADE_SCALE_IMAGE}):
 
 		'''
 			- threshold: 		this will ensure that if the captured face is within
@@ -34,6 +34,7 @@ class StableFaceCapture:
 
 		# Inherit parameters
 		self.threshold = threshold
+		self.foreheadSize = foreheadSize
 		self.cvArgs = cvArgs
 
 		# Initialize camera and cascade classifier
@@ -132,20 +133,33 @@ class StableFaceCapture:
 					return self.F
 
 
-cap = StableFaceCapture()
+	def getForehead(self, faceLoc):
+		(x,y,w,h) = faceLoc
+		X = int(x + float(w)/2 - (self.foreheadSize[0]/2))
+		Y = int(y + float(h)/5)
 
-while(True):
+		return (X,Y,self.foreheadSize[0], self.foreheadSize[1])
 
-	img = cap.getCapture()
-	loc = cap.getFace(img)
 
-	if loc is not None:
-		(x,y,w,h) = loc
-		cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
-		cv2.imshow('camera', img)
-	else:
-		cv2.imshow('camera', img)
-		pass
+# DEMO
+if __name__=='__main__':
 
-	if cv2.waitKey(1) == 27: 
-		break  # esc to quit
+	cap = StableFaceCapture(threshold=0.025)
+
+	while(True):
+
+		img = cap.getCapture()
+		loc = cap.getFace(img)
+
+		if loc is not None:
+			(x, y, w, h) = loc
+			(fx, fy, fw, fh) = cap.getForehead(loc)
+			cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+			cv2.rectangle(img, (fx, fy), (fx+fw, fy+fh), (0, 0, 255), 2)
+			cv2.imshow('camera', img)
+		else:
+			cv2.imshow('camera', img)
+			pass
+
+		if cv2.waitKey(1) == 27: 
+			break  # esc to quit
