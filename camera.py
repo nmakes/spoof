@@ -183,14 +183,17 @@ class StableFaceCapture:
 
 class StableKeypointExtractor:
 
-	def __init__(self, dims, landmarks=5, threshold=0.02):
+	def __init__(self, dims, landmarks=5, threshold=0.02, useDlibDetector=True):
 		
+		self.useDlibDetector = useDlibDetector
+		self.detector = dlib.get_frontal_face_detector()		
 		self.predictor = dlib.shape_predictor('etc/shape_predictor_' + str(landmarks) + '_face_landmarks.dat')
 		self.threshold = threshold
 		self.camWidth = dims[0]
 		self.camHeight = dims[1]
 		self.camDiag = np.sqrt(dims[0]**2 + dims[1]**2)
 		self.shape = None
+		self.rect = None
 
 
 	def withinThreshold(self, shape):
@@ -206,27 +209,39 @@ class StableKeypointExtractor:
 		# Set camera dimensions
 
 		# Convert data for dlib
-		(x,y,w,h) = loc
-		(x,y,w,h) = (x,y,w+20,h+20)
-		rect = dlib.rectangle(x, y, x+w, y+h)
+		if (self.useDlibDetector):
+			rects = self.detector(img, 0)
+			if(len(rects)>0):
+				self.rect = rects[0]
+		else:
+			(x,y,w,h) = loc
+			(x,y,w,h) = (x,y,w+20,h+20)
+			self.rect = dlib.rectangle(x, y, x+w, y+h)
+
 		gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-		# If it is the first extraction, set the shape and return it
-		if self.shape is None:
-			self.shape = self.predictor(gray, rect)
-			self.shape = face_utils.shape_to_np(self.shape)
+		if self.rect is not None:
 
-		# Otherwise, check for threshold bounds and return the appropriate shape
-		else:
-			tempshape = self.predictor(gray, rect)
-			tempshape = face_utils.shape_to_np(tempshape)
+			# If it is the first extraction, set the shape and return it
+			if self.shape is None:
+				self.shape = self.predictor(gray, self.rect)
+				self.shape = face_utils.shape_to_np(self.shape)
 
-			if self.withinThreshold(tempshape):
-				return self.shape
+			# Otherwise, check for threshold bounds and return the appropriate shape
 			else:
-				self.shape = tempshape
+				tempshape = self.predictor(gray, self.rect)
+				tempshape = face_utils.shape_to_np(tempshape)
 
-		return self.shape
+				if self.withinThreshold(tempshape):
+					return self.shape
+				else:
+					self.shape = tempshape
+
+			return self.shape
+
+		else:
+
+			return []
 
 
 # DEMO
