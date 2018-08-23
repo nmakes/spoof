@@ -1,3 +1,13 @@
+'''
+	Written By Naveen Venkat
+	nav.naveenvenkat@gmail.com
+	github.com/nmakes/spoof
+	Final Year Undergraduate, BITS Pilani
+
+	This work is licenced under a Creative Commons Attribution-NonCommercial-ShareAlike 
+	(CC BY-NC-SA) licence. 
+'''
+
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -95,7 +105,8 @@ class StableFaceCapture:
 				flags=self.cvArgs['flags']
 			)
 
-		# If no faces are found, we need to increase the noDetectionCounter
+		# If no faces are found, we need to increase the noDetectionCounter, but return the previous
+		# detected face region so as to avoid spikes in the estimation
 		if len(faces) == 0:
 			
 			self.noDetectionCounter += 1
@@ -104,7 +115,7 @@ class StableFaceCapture:
 				self.noDetectionCounter = 0
 				self.ROI = (0, 0, self.camWidth, self.camHeight)
 
-			return None
+			return self.F
 
 		# Otherwise, reset the noDetectionCounter & continue the execution
 		else:
@@ -149,15 +160,15 @@ class StableFaceCapture:
 			X = int(x + float(w)/2 - (self.foreheadSize[0]/2))
 			Y = int(y + float(h)/5)
 			return (X,Y,self.foreheadSize[0], self.foreheadSize[1])
+
 		elif (mode=='relative'):
 			f = self.foreheadScale
 			X = int(x + float(w)/2 - (self.foreheadSize[0]/2) - int( (w*f)/2))
 			Y = int(y + float(h)/5)
 			return (X, Y, int(w*f), int(h*f))
+			
 		else:
 			raise ValueError('"mode" argument can only be either "absolute" or "relative"')
-
-		
 
 
 # DEMO
