@@ -19,14 +19,7 @@ class StableFaceCapture:
 		in the frame.
 	'''
 
-	def __init__(	self, 
-					threshold=0.05, 
-					noDetectionLimit=5,
-					cvArgs={'scaleFactor':1.1, 
-							'minNeighbors':5, 
-							'minSize':(30, 30),
-							'flags':cv2.CASCADE_SCALE_IMAGE}
-				):
+	def __init__(self, threshold=0.05, noDetectionLimit=5, cvArgs={'scaleFactor':1.1, 'minNeighbors':5, 'minSize':(30, 30),'flags':cv2.CASCADE_SCALE_IMAGE}):
 
 		'''
 			- threshold: 		this will ensure that if the captured face is within
@@ -45,50 +38,48 @@ class StableFaceCapture:
 
 		# Initialize camera and cascade classifier
 		self.cam = cv2.VideoCapture(0)
+		self.camWidth = self.cam.get(cv2.CAP_PROP_FRAME_WIDTH)
+		self.camHeight = self.cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
+		self.camDiag = np.sqrt(self.camWidth**2 + self.camHeight**2)
 		self.faceCascade = cv2.CascadeClassifier('haarcascade_frontalface_alt.xml')
 
 		# Region of Interest
-		self.ROIx = None
-		self.ROIy = None
-		self.ROIw = None
-		self.ROIh = None
+		self.ROI = None # np.array([0,0,0,0]) # (x,y,w,h)
 
 		# Face capture
-		self.Fx = None
-		self.Fy = None
-		self.Fw = None
-		self.Fh = None
+		self.F = None # np.array([0,0,0,0]) # (x,y,w,h)
 
 		# Counters for stable face detection
 		self.noDetectionLimit = noDetectionLimit
 		self.noDetectionCounter = 0
 
 
-	def withinThreshold(x,y,w,h):
+	def withinThreshold(self, loc):
 
-		dx = self.Fx - x
-		dy = self.Fy - y
-		dw = self.Fw - w
-		dh = self.Fh - h
+		dF = np.abs(self.F - np.array(loc)) / self.camDiag
+		if np.all(dF <= self.threshold):
+			return True
+		else:
+			return False
 
 
-	def getCapture():
+	def getCapture(self):
 
 		ret_val, img = self.cam.read()
 		return img
 
 
-	def getFace(img):
+	def getFace(self, img=None):
 
-		if self.ROIx is None: # First detection attempt
+		if img is None:
+			img = self.getCapture()
 
-			self.ROIx = 0
-			self.ROIy = 0
-			self.ROIw = img.shape[1]
-			self.ROIh = img.shape[0]
+		if self.ROI is None: # First detection attempt
+			self.ROI = (0, 0, self.camWidth, self.camHeight) # (x,y,w,h)
 
 		# Get the image inside the ROI
-		roiImg = img[self.ROIy : self.ROIy + self.ROIh, self.ROIx : self.ROIx + self.ROIh]
+		roiImg = img[	int(self.ROI[1]) : int(self.ROI[1]) + int(self.ROI[3]), 
+						int(self.ROI[0]) : int(self.ROI[0]) + int(self.ROI[2])]
 
 		# Get the gray image (for haar cascade classification)
 		grayRoiImg = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -105,33 +96,56 @@ class StableFaceCapture:
 		# If no faces are found, we need to increase the noDetectionCounter
 		if len(faces) == 0:
 			
-			noDetectionCounter += 1
+			self.noDetectionCounter += 1
 			
-			if(noDetectionCounter==noDetectionLimit):
-				noDetectionCounter = 0
-				self.ROIx = 0
-				self.ROIy = 0
-				self.ROIw = img.shape[1]
-				self.ROIh = img.shape[0]
+			if(self.noDetectionCounter==self.noDetectionLimit):
+				self.noDetectionCounter = 0
+				self.ROI = (0, 0, self.camWidth, self.camHeight)
 
 			return None
 
 		# Otherwise, reset the noDetectionCounter & continue the execution
 		else:
-			noDetectionCounter = 0
+			self.noDetectionCounter = 0
 
 		# For the captured face(s), get the position of the face
+		# Note: x, y are with respect to the image fed to the classifier. Thus,
+		# these will be relative to the region of interest, and hence we add
+		# ROI values to the x & y values.
 		for (x,y,w,h) in faces:
 
 			# If it is the first detection of a face, simply set the variables
-			if(self.Fx is None): 
-				self.Fx = x
-				self.Fy = y
-				self.Fw = w
-				self.Fh = h
+			if(self.F is None): 
+				self.F = np.array([self.ROI[0] + x, self.ROI[1] + y, w, h])
+				return self.F
 
-			# Otherwise, check threshold and perform bounding box check
+			# Otherwise, check the threshold
 			else:
 
+				# If the new region is within the threshold, return the old value
+				if( self.withinThreshold((x,y,w,h)) ):
+					return self.F
 
-			break # Get only one face
+				# Otherwise, return the new region, while setting it to be the face region
+				else:
+					self.F = np.array([x,y,w,h])
+					return self.F
+
+
+cap = StableFaceCapture()
+
+while(True):
+
+	img = cap.getCapture()
+	loc = cap.getFace(img)
+
+	if loc is not None:
+		(x,y,w,h) = loc
+		cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+		cv2.imshow('camera', img)
+	else:
+		cv2.imshow('camera', img)
+		pass
+
+	if cv2.waitKey(1) == 27: 
+		break  # esc to quit
