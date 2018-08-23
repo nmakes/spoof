@@ -19,7 +19,7 @@ class StableFaceCapture:
 		in the frame.
 	'''
 
-	def __init__(self, threshold=0.05, noDetectionLimit=5, foreheadSize=(15, 10), cvArgs={'scaleFactor':1.1, 'minNeighbors':5, 'minSize':(30, 30),'flags':cv2.CASCADE_SCALE_IMAGE}):
+	def __init__(self, threshold=0.025, noDetectionLimit=5, foreheadSize=(15, 10), foreheadScale=0.07, cvArgs={'scaleFactor':1.1, 'minNeighbors':5, 'minSize':(30, 30),'flags':cv2.CASCADE_SCALE_IMAGE}):
 
 		'''
 			- threshold: 		this will ensure that if the captured face is within
@@ -35,6 +35,7 @@ class StableFaceCapture:
 		# Inherit parameters
 		self.threshold = threshold
 		self.foreheadSize = foreheadSize
+		self.foreheadScale = foreheadScale
 		self.cvArgs = cvArgs
 
 		# Initialize camera and cascade classifier
@@ -133,12 +134,30 @@ class StableFaceCapture:
 					return self.F
 
 
-	def getForehead(self, faceLoc):
-		(x,y,w,h) = faceLoc
-		X = int(x + float(w)/2 - (self.foreheadSize[0]/2))
-		Y = int(y + float(h)/5)
+	def getForehead(self, faceLoc, mode='absolute'):
+		
+		'''
+			mode:
+				- "absolute": indicates we want to extract a box of dimensions given by foreheadSize
+				- "relative": indicates that the dimensions of the box will be with respect to the size
+				of the detected face.
+		'''
 
-		return (X,Y,self.foreheadSize[0], self.foreheadSize[1])
+		(x,y,w,h) = faceLoc
+
+		if (mode=='absolute'):
+			X = int(x + float(w)/2 - (self.foreheadSize[0]/2))
+			Y = int(y + float(h)/5)
+			return (X,Y,self.foreheadSize[0], self.foreheadSize[1])
+		elif (mode=='relative'):
+			f = self.foreheadScale
+			X = int(x + float(w)/2 - (self.foreheadSize[0]/2) - int( (w*f)/2))
+			Y = int(y + float(h)/5)
+			return (X, Y, int(w*f), int(h*f))
+		else:
+			raise ValueError('"mode" argument can only be either "absolute" or "relative"')
+
+		
 
 
 # DEMO
@@ -153,7 +172,7 @@ if __name__=='__main__':
 
 		if loc is not None:
 			(x, y, w, h) = loc
-			(fx, fy, fw, fh) = cap.getForehead(loc)
+			(fx, fy, fw, fh) = cap.getForehead(loc, mode='relative')
 			cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
 			cv2.rectangle(img, (fx, fy), (fx+fw, fy+fh), (0, 0, 255), 2)
 			cv2.imshow('camera', img)
