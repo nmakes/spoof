@@ -197,6 +197,7 @@ class StableKeypointExtractor:
 
 
 	def withinThreshold(self, shape):
+		
 		ts = np.abs( (self.shape - shape) / self.camDiag )
 		if (np.all(ts <= self.threshold)):
 			return True
@@ -205,21 +206,23 @@ class StableKeypointExtractor:
 
 
 	def detectKeypoints(self, img, loc):
-		
-		# Set camera dimensions
 
-		# Convert data for dlib
+		# Either use dlib's detector
 		if (self.useDlibDetector):
 			rects = self.detector(img, 0)
 			if(len(rects)>0):
 				self.rect = rects[0]
+
+		# or convert data for dlib
 		else:
 			(x,y,w,h) = loc
 			(x,y,w,h) = (x,y,w+20,h+20)
 			self.rect = dlib.rectangle(x, y, x+w, y+h)
 
+		# Get the gray image
 		gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
+		# If rectangle is found, then extract keypoints
 		if self.rect is not None:
 
 			# If it is the first extraction, set the shape and return it
@@ -239,8 +242,8 @@ class StableKeypointExtractor:
 
 			return self.shape
 
+		# Otherwise, return an empty list (of facial keypoints)
 		else:
-
 			return []
 
 
@@ -248,7 +251,7 @@ class StableKeypointExtractor:
 if __name__=='__main__':
 
 	cap = StableFaceCapture(threshold=0.025)
-	ke = StableKeypointExtractor(dims=cap.getCamDims(), landmarks=68, threshold=0.02)
+	ke = StableKeypointExtractor(dims=cap.getCamDims(), landmarks=5, threshold=0.02)
 
 	while(True):
 
