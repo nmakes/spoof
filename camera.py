@@ -1,5 +1,5 @@
 '''
-	Written By Naveen Venkat
+	Written By Naveen Venkat, 2018
 	nav.naveenvenkat@gmail.com
 	github.com/nmakes/spoof
 	Final Year Undergraduate, BITS Pilani
@@ -70,8 +70,12 @@ class StableFaceCapture:
 
 
 	def getCamDims(self):
-		return (self.camWidth, self.camHeight)
+		# For openCV like dimensions
+		return (int(self.camWidth), int(self.camHeight))
 
+	def getCamShape(self):
+		# For numpy like shape
+		return (int(self.camHeight), int(self.camWidth))
 
 	def withinThreshold(self, loc):
 
