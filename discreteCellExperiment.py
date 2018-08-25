@@ -48,13 +48,19 @@ class DiscreteCellExperiment:
 						# Take the mean of the corresponding portion of the image
 						self.buffer[i*self.cellH:(i+1)*self.cellH, j*self.cellW:(j+1)*self.cellW, c] = int(np.mean(img[i*self.cellH:(i+1)*self.cellH, j*self.cellW:(j+1)*self.cellW, c]))
 
+			# AVERAGE IMAGE
 			cv2.imshow('average image', self.buffer)
 
-			if cv2.waitKey(1) == 27: 
+			# DIFFERENCE IMAGE
+			difim = np.abs(img - self.buffer)
+			cv2.imshow('diff image', difim)
+
+			if cv2.waitKey(1) == 27:
 				break  # esc to quit
 
 
 if __name__=='__main__':
 
-	exp = DiscreteCellExperiment(rows=25, cols=25)
+	r, c = 30, 40
+	exp = DiscreteCellExperiment(rows=r, cols=c)
 	exp.run()
