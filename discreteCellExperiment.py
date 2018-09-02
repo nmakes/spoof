@@ -55,6 +55,15 @@ class DiscreteCellExperiment:
 			difim = np.abs(img - self.buffer)
 			cv2.imshow('diff image', difim)
 
+			# REDIF IMAGE
+			redifim = np.abs(img - difim)
+			cv2.imshow('redif image', redifim)
+
+			# SQUARED IMAGE
+			img = img * 2
+			img = np.array( (img / img.max(axis=None) ) * 255, dtype=np.uint8 )
+			cv2.imshow('pow image', img)
+
 			if cv2.waitKey(1) == 27:
 				break  # esc to quit
 
